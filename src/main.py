@@ -15,8 +15,6 @@ from sqlalchemy.exc import IntegrityError
 
 # utils >>>
 from src.utils.password_generator import get_encrypted_pass, decode_password
-from src.utils.excel_to_database import get_projects_from_excel
-from src.utils.get_raw_data import obtener_facultades, obtener_grupos_inv, obtener_programas_academicos
 from src.utils.bunny_cdn import secure_filename
 
 Base.metadata.create_all(bind=engine)
@@ -26,6 +24,8 @@ app = FastAPI()
 origins = [
     "http://localhost",
     "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://finu-ufps-frontend-lennydeveloper.vercel.app"
 ]
 
 app.add_middleware(
@@ -44,62 +44,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
-
-@app.get('/')
-def _home(db: Session = Depends(get_db)):
-    projects = get_projects_from_excel()
-    try:
-        db.bulk_save_objects(projects, update_changed_only=False)
-        db.commit()
-        content = jsonable_encoder({ "success": "La información ha sido agregada exitosamente." })
-        return JSONResponse(content=content, status_code=200)
-    except Exception as e:
-        print(e)
-        content = jsonable_encoder(content = { "error": "La información de los proyectos no pudo ser cargada." })
-        return JSONResponse(content=content, status_code=500)
-    
-
-@app.get('/upload/facultades')
-def _cargar_facultades(db: Session = Depends(get_db)):
-    facultades = obtener_facultades()
-    try:
-        db.bulk_save_objects(facultades, update_changed_only=False)
-        db.commit()
-        content = jsonable_encoder({ "success": "Las facultades han sido agregadas exitosamente." })
-        return JSONResponse(content=content, status_code=200)
-    except Exception as e:
-        print(e)
-        content = jsonable_encoder(content = { "error": "La información de las facultades no pudo ser cargada." })
-        return JSONResponse(content=content, status_code=500)
-    
-
-@app.get('/upload/grupos-investigacion')
-def _cargar_grupos_inv(db: Session = Depends(get_db)):
-    grupos_inv = obtener_grupos_inv()
-    try:
-        db.bulk_save_objects(grupos_inv, update_changed_only=False)
-        db.commit()
-        content = jsonable_encoder({ "success": "Los grupos de investigación han sido agregados exitosamente." })
-        return JSONResponse(content=content, status_code=200)
-    except Exception as e:
-        print(e)
-        content = jsonable_encoder(content = { "error": "La información de los grupos de investigación no pudo ser cargada." })
-        return JSONResponse(content=content, status_code=500)
-    
-
-@app.get('/upload/programas')
-def _cargar_programas(db: Session = Depends(get_db)):
-    programas = obtener_programas_academicos()
-    try:
-        db.bulk_save_objects(programas, update_changed_only=False)
-        db.commit()
-        content = jsonable_encoder({ "success": "Los programas académicos han sido agregados exitosamente." })
-        return JSONResponse(content=content, status_code=200)
-    except Exception as e:
-        print(e)
-        content = jsonable_encoder(content = { "error": "La información de los programas académicos no pudo ser cargada." })
-        return JSONResponse(content=content, status_code=500)
 
 
 @app.post('/registro/usuario', response_model=UserResponseSchema, response_model_exclude={'clave'}, status_code=201)
