@@ -23,6 +23,7 @@ def obtener_facultades():
     route = r'D:\Freelance\facultades.txt'
     data = get_raw_data(route)
     facultades = [Facultad(nombre=item) for item in data]
+    print(facultades)
 
     return facultades
 
@@ -34,11 +35,3 @@ def get_raw_data(route):
             data.append(line.strip()) 
 
     return data
-
-
-programas = obtener_programas_academicos()
-facultades = obtener_facultades()
-grupos = obtener_grupos_inv()
-#print(grupos)
-#print([item.nombre for item in facultades])
-#print([[item.nombre, item.facultad_id] for item in programas])

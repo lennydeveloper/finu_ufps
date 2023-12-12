@@ -1,6 +1,5 @@
-from sqlalchemy import Column, ForeignKey, Integer, String, Date
+from sqlalchemy import Column, ForeignKey, Integer, String, DateTime, Date
 from sqlalchemy.orm import relationship
-from datetime import date, datetime
 
 from database import Base
 
@@ -32,8 +31,9 @@ class Facultad(Base):
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, index=True)
 
-    programas = relationship("Programa", back_populates="facultades")
-    directores_facultad = relationship("DirFacultad", back_populates="facultades")
+    programas = relationship("Programa", back_populates="facultad")
+    director_facultad = relationship("DirFacultad", back_populates="facultad")
+    propuesta = relationship('Propuesta', back_populates="facultad")
 
 
 class Programa(Base):
@@ -43,8 +43,10 @@ class Programa(Base):
     nombre = Column(String, index=True)
     facultad_id = Column(Integer, ForeignKey("facultades.id"), nullable=True)
 
-    facultades = relationship("Facultad", back_populates="programas")
-    directores_programa = relationship('DirPrograma', back_populates="programas")
+    facultad = relationship("Facultad", back_populates="programas")
+    director_programa = relationship('DirPrograma', back_populates="programa")
+    propuesta = relationship('Propuesta', back_populates="programa")
+    usuario = relationship('Usuario', back_populates="programa")
 
 
 class GrupoInv(Base):
@@ -54,6 +56,29 @@ class GrupoInv(Base):
     nombre = Column(String, index=True)
 
     directores_grupos_inv = relationship('DirGrupoInv', back_populates="grupos_inv")
+    propuestas = relationship('Propuesta', back_populates="grupos_investigacion")
+
+
+class Propuesta(Base):
+    __tablename__ = 'propuestas'
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String)
+    descripcion = Column(String)
+    usuario_id = Column(Integer, ForeignKey('usuarios.id'))
+    grupo_inv_id = Column(Integer, ForeignKey("grupos_inv.id"))
+    facultad_id = Column(Integer, ForeignKey("facultades.id"))
+    programa_id = Column(Integer, ForeignKey("programas.id"))
+    url_archivo = Column(String)
+    estado_id = Column(Integer, ForeignKey("estados.id"))
+    convocatoria_id = Column(Integer, ForeignKey("convocatorias.id"))
+
+    grupos_investigacion = relationship('GrupoInv', back_populates="propuestas")
+    usuario = relationship('Usuario', back_populates='propuesta')
+    estado = relationship('Estado', back_populates="propuesta")
+    facultad = relationship('Facultad', back_populates="propuesta")
+    programa = relationship('Programa', back_populates="propuesta")
+    convocatoria = relationship('Convocatoria', back_populates="propuesta")
 
 
 class DirFacultad(Base):
@@ -63,7 +88,7 @@ class DirFacultad(Base):
     nombre = Column(String, index=True)
     facultad_id = Column(Integer, ForeignKey("facultades.id"))
 
-    facultades = relationship("Facultad", back_populates="directores_facultad")
+    facultad = relationship("Facultad", back_populates="director_facultad")
 
 
 class DirGrupoInv(Base):
@@ -81,9 +106,9 @@ class DirPrograma(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, index=True)
-    programa = Column(Integer, ForeignKey("programas.id"))
+    programa_id = Column(Integer, ForeignKey("programas.id"))
 
-    programas = relationship('Programa', back_populates="directores_programa")
+    programa = relationship('Programa', back_populates="director_programa")
 
 
 class Usuario(Base):
@@ -95,19 +120,50 @@ class Usuario(Base):
     telefono = Column(String)
     email = Column(String, index=True)
     clave = Column(String)
+    rol_id = Column(Integer, ForeignKey("roles.id"))
+    codigo = Column(String)
+    programa_id = Column(Integer, ForeignKey("programas.id"))
+
+    rol = relationship('Rol', back_populates="usuario")
+    programa = relationship('Programa', back_populates="usuario")
+    propuesta = relationship('Propuesta', back_populates='usuario')
+
+
+class Rol(Base):
+    __tablename__ = "roles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String)
+
+    usuario = relationship('Usuario', back_populates="rol")
+
+
+class Estado(Base):
+    __tablename__ = "estados"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String)
+    descripcion = Column(String)
+
+    propuesta = relationship('Propuesta', back_populates="estado")
 
 
 class Convocatoria(Base):
     __tablename__ = "convocatorias"
 
     id = Column(Integer, primary_key=True, index=True)
-    fecha_inscripcion = Column(Date)
-    fecha_evaluacion = Column(Date)
+    titulo = Column(String)
+    descripcion = Column(String)
+    fecha_inicio = Column(Date)
+    fecha_limite = Column(Date)
+    fecha_inicio_evaluacion = Column(Date)
+    fecha_fin_evaluacion = Column(Date)
     fecha_publicacion_resultados = Column(Date)
-    # id_coordinador (FK pending)
-    titulo_convocatoria = Column(String, index=True)
-    descripcion_convocatoria = Column(String)
-    anio_convocatoria = Column(Date)
+    url_archivo = Column(String)
+    anio_convocatoria = Column(String)
+    tipo_convocatoria = Column(String)
+
+    propuesta = relationship('Propuesta', back_populates="convocatoria")
 
 
 class Proyecto(Base):
@@ -143,4 +199,3 @@ class Proyecto(Base):
     observaciones = Column(String, nullable=True)
     producto = Column(String, nullable=True)
     nombre_producto = Column(String, nullable=True)
-
