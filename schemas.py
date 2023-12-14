@@ -108,7 +108,7 @@ class GrupoInvSchema(FinuBase):
         orm_mode = True
 
 
-class PropuestaSchema(BaseModel):
+class BasePropuestaSchema(BaseModel):
     id: int
     nombre: str
     descripcion: str
@@ -118,7 +118,7 @@ class PropuestaSchema(BaseModel):
     facultad: FacultadSchema
     estado: EstadoSchema
     usuario: UserResponseSchema
-    url_archivo: str
+    url_archivo_propuesta: str
 
     class Config:
         orm_mode = True

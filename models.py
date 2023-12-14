@@ -32,7 +32,6 @@ class Facultad(Base):
     nombre = Column(String, index=True)
 
     programas = relationship("Programa", back_populates="facultad")
-    director_facultad = relationship("DirFacultad", back_populates="facultad")
     propuesta = relationship('Propuesta', back_populates="facultad")
 
 
@@ -44,7 +43,6 @@ class Programa(Base):
     facultad_id = Column(Integer, ForeignKey("facultades.id"), nullable=True)
 
     facultad = relationship("Facultad", back_populates="programas")
-    director_programa = relationship('DirPrograma', back_populates="programa")
     propuesta = relationship('Propuesta', back_populates="programa")
     usuario = relationship('Usuario', back_populates="programa")
 
@@ -55,7 +53,6 @@ class GrupoInv(Base):
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, index=True)
 
-    directores_grupos_inv = relationship('DirGrupoInv', back_populates="grupos_inv")
     propuestas = relationship('Propuesta', back_populates="grupos_investigacion")
 
 
@@ -69,9 +66,12 @@ class Propuesta(Base):
     grupo_inv_id = Column(Integer, ForeignKey("grupos_inv.id"))
     facultad_id = Column(Integer, ForeignKey("facultades.id"))
     programa_id = Column(Integer, ForeignKey("programas.id"))
-    url_archivo = Column(String)
+    url_archivo_propuesta = Column(String)
     estado_id = Column(Integer, ForeignKey("estados.id"))
     convocatoria_id = Column(Integer, ForeignKey("convocatorias.id"))
+    observaciones = Column(String, nullable=True)
+    calificacion = Column(Integer, nullable=True)
+    url_archivo_calificacion = Column(String, nullable=True)
 
     grupos_investigacion = relationship('GrupoInv', back_populates="propuestas")
     usuario = relationship('Usuario', back_populates='propuesta')
@@ -79,36 +79,6 @@ class Propuesta(Base):
     facultad = relationship('Facultad', back_populates="propuesta")
     programa = relationship('Programa', back_populates="propuesta")
     convocatoria = relationship('Convocatoria', back_populates="propuesta")
-
-
-class DirFacultad(Base):
-    __tablename__ = "dir_facultad"
-
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String, index=True)
-    facultad_id = Column(Integer, ForeignKey("facultades.id"))
-
-    facultad = relationship("Facultad", back_populates="director_facultad")
-
-
-class DirGrupoInv(Base):
-    __tablename__ = "dir_grupo_inv"
-
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String, index=True)
-    grupo_inv_id = Column(Integer, ForeignKey("grupos_inv.id"))
-
-    grupos_inv = relationship('GrupoInv', back_populates="directores_grupos_inv")
-
-
-class DirPrograma(Base):
-    __tablename__ = "dir_programa"
-
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String, index=True)
-    programa_id = Column(Integer, ForeignKey("programas.id"))
-
-    programa = relationship('Programa', back_populates="director_programa")
 
 
 class Usuario(Base):

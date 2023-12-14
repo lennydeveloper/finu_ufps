@@ -1,20 +1,19 @@
 from fastapi import Depends, FastAPI, HTTPException, UploadFile, File, Form
-from sqlalchemy.orm import Session
-from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
-import requests
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.exceptions import ResponseValidationError
+from sqlalchemy.orm import Session
 from typing import Annotated
 from datetime import datetime, date
+import requests
 
-from crud import get_user_by_email, create_user, create_convocatoria, create_propuesta, get_dashboard_totales, get_facultades, get_programas, get_grupos_inv, get_proyectos, get_convocatorias, get_usuarios, get_propuestas # , get_users, get_user, create_user_item, get_items
-from models import Base, Usuario, Facultad, Programa, GrupoInv, Convocatoria, Rol, Propuesta
-from schemas import UserLoginSchema, UserSchema, CreateUserSchema, UserResponseSchema, PropuestaSchema, BaseUser, BaseConvocatoria, FacultadSchema, ProgramaSchema, GrupoInvSchema, ConvocatoriaSchema # , ItemCreate, Item, User, UserCreate
+from crud import get_user_by_email, create_user, create_propuesta, get_dashboard_totales, get_facultades, get_programas, get_grupos_inv, get_proyectos, get_convocatorias, get_usuarios, get_propuestas, get_informacion_propuesta # , get_users, get_user, create_user_item, get_items
+from models import Base, Usuario, Facultad, Programa, GrupoInv, Convocatoria, Rol, Propuesta, Estado
+from schemas import UserLoginSchema, UserSchema, CreateUserSchema, UserResponseSchema, BasePropuestaSchema, BaseUser, BaseConvocatoria, FacultadSchema, ProgramaSchema, GrupoInvSchema, ConvocatoriaSchema # , ItemCreate, Item, User, UserCreate
 from database import SessionLocal, engine
-from sqlalchemy.exc import IntegrityError
 
 # utils >>>
-from src.utils.password_generator import get_encrypted_pass, decode_password
+from src.utils.password_generator import decode_password
 from src.utils.bunny_cdn import secure_filename
 
 Base.metadata.create_all(bind=engine)
@@ -89,58 +88,70 @@ async def _register_convocatoria(titulo: Annotated[str, Form()], descripcion: An
 
 @app.post('/registro/propuesta', status_code=201)
 async def _register_propuesta(titulo: Annotated[str, Form()], descripcion: Annotated[str, Form()], usuario_id: Annotated[int, Form()], grupo_inv: Annotated[int, Form()], facultad: Annotated[int, Form()], programa: Annotated[int, Form()], convocatoria_id: Annotated[int, Form()], file: UploadFile = File(...), db: Session = Depends(get_db)):
-    try:
-        STORAGE_ZONE_NAME = 'finu-storage'
-        ACCESS_KEY = '64e5ab92-d290-4a0b-96cd1770b46c-2bb2-4201'
-        BASE_URL = "storage.bunnycdn.com"
-        NAME = secure_filename(file.filename)
+    STORAGE_ZONE_NAME = 'finu-storage'
+    ACCESS_KEY = '64e5ab92-d290-4a0b-96cd1770b46c-2bb2-4201'
+    BASE_URL = "storage.bunnycdn.com"
+    NAME = secure_filename(file.filename)
 
-        headers = {
-        "AccessKey": ACCESS_KEY,
-        "Content-Type": "application/octet-stream",
-        "accept": "application/json"
+    headers = {
+    "AccessKey": ACCESS_KEY,
+    "Content-Type": "application/octet-stream",
+    "accept": "application/json"
+    }
+
+    with open(file.filename, 'wb'):
+        content = await file.read()
+        url = f"https://{BASE_URL}/{STORAGE_ZONE_NAME}/{NAME}"
+        response = requests.put(url, headers=headers, data=content)
+
+        data = {
+            'titulo': titulo,
+            'descripcion': descripcion,
+            'usuario_id': usuario_id,
+            'grupo_inv': grupo_inv,
+            'facultad': facultad,
+            'programa': programa,
+            'convocatoria_id': convocatoria_id,
+            'url_archivo_propuesta': url,
         }
 
-        with open(file.filename, 'wb'):
-            content = await file.read()
-            url = f"https://{BASE_URL}/{STORAGE_ZONE_NAME}/{NAME}"
-            response = requests.put(url, headers=headers, data=content)
-
-            data = {
-                'titulo': titulo,
-                'descripcion': descripcion,
-                'usuario_id': usuario_id,
-                'grupo_inv': grupo_inv,
-                'facultad': facultad,
-                'programa': programa,
-                'convocatoria_id': convocatoria_id,
-                'url_archivo': url,
-            }
-
-            return create_propuesta(db=db, data=data)
-    except Exception as e:
-        return JSONResponse(content='Ha ocurrido un error al momento de cargar el archivo, por favor intente nuevamente', status_code=500)
+        return create_propuesta(db=db, data=data)
 
 
 @app.post('/login', response_model=UserResponseSchema, response_model_exclude={'clave'}, status_code=200)
 def _login(user: UserLoginSchema, db: Session = Depends(get_db)):
     # get password from db
     db_user = get_user_by_email(db, email=user.email)
-    password = decode_password(db_user.clave)
-
     # user not exists
     if not db_user:
-        raise HTTPException(status_code=404, detail="El usuario no existe")
-    
+        return JSONResponse(content='El usuario no existe', status_code=404)
+        # raise HTTPException(status_code=404, detail="El usuario no existe")
+
+    password = decode_password(db_user.clave)
     # wrong password
     if user.clave != password:
-        raise HTTPException(status_code=401, detail="Las credenciales no son válidas")
+        return JSONResponse(content='Las credenciales no son válidas', status_code=401)
     return db_user
+
+
+@app.get('/estados', status_code=200)
+def _estados(db: Session = Depends(get_db)):
+    # obtener los estados
+    return db.query(Estado).all()
 
 
 @app.get('/dashboard/totales', status_code=200)
 def _dashboard_totales(db: Session = Depends(get_db)):
     data = get_dashboard_totales(db)
+    return data
+
+
+@app.get('/info-propuesta', status_code=200)
+def _get_informacion_propuesta(db: Session = Depends(get_db)):
+    '''
+    este endpoint tiene como finalidad obtener grupos, facultades y programas registradas en la bd
+    '''
+    data = get_informacion_propuesta(db)
     return data
 
 
@@ -174,10 +185,16 @@ def _obtener_usuarios(skip: int = 0, limit: int = 0, db: Session = Depends(get_d
     return items
 
 
-@app.get("/propuestas", response_model_exclude={'usuario.clave'}, response_model=list[PropuestaSchema])
+@app.get("/propuestas", response_model_exclude={'usuario.clave'}, response_model=list[BasePropuestaSchema])
 def _obtener_propuestas(usuario_id: int = 0, convocatoria_id: int = 0, db: Session = Depends(get_db)):
     return get_propuestas(db=db, usuario_id=usuario_id, convocatoria_id=convocatoria_id)
-    # return JSONResponse(content='buena mostro', status_code=200)
+
+
+@app.post("/update/estado-propuesta", status_code=200)
+def _actualizar_estado_propuesta(propuesta_id: Annotated[str, Form()], estado_id: Annotated[str, Form()], observaciones: str = Form(None), db: Session = Depends(get_db)):
+    db.query(Propuesta).filter(Propuesta.id == propuesta_id).update({Propuesta.estado_id: estado_id, Propuesta.observaciones: observaciones})
+    db.commit()
+    return JSONResponse(content='La propuesta ha sido actualizada')
 
 
 @app.post('/upload/files', status_code=201)
@@ -205,9 +222,6 @@ async def _upload(file: UploadFile = File(...)):
 
 @app.get("/download")
 def _download(url: str):
-    from fastapi.responses import StreamingResponse
-    import requests
-
     STORAGE_ZONE_NAME = 'finu-storage'
     ACCESS_KEY = '64e5ab92-d290-4a0b-96cd1770b46c-2bb2-4201'
     BASE_URL = "storage.bunnycdn.com"

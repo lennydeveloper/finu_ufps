@@ -1,5 +1,4 @@
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
 
 # from models import User, Item
 # from schemas import UserCreate, ItemCreate
@@ -77,6 +76,18 @@ def get_dashboard_totales(db: Session):
     }
 
 
+def get_informacion_propuesta(db: Session):
+    programas = db.query(Programa).all()
+    grupos_inv = db.query(GrupoInv).all()
+    facultades = db.query(Facultad).all()
+
+    return {
+        'programas': programas,
+        'grupos_inv': grupos_inv,
+        'facultades': facultades
+    }
+
+
 def create_user(db: Session, user: BaseUser):
     rol_db = db.query(Rol).filter(Rol.id == user.rol).first()
     programa_db = db.query(Programa).filter(Programa.id == user.programa).first()
@@ -111,39 +122,41 @@ def create_user(db: Session, user: BaseUser):
 
 
 def create_propuesta(db: Session, data: dict):
+    # validación máximo 2 propuestas por usuario
+    count_propuestas = db.query(Propuesta).filter(Propuesta.usuario_id == data['usuario_id']).count()
+    if count_propuestas == 2:
+        raise HTTPException(status_code=409, detail="La propuesta no pudo ser creada, ya tiene el máximo de propuestas permitidas para esta convocatoria")
     # get grupo_inv
     grupo_inv = db.query(GrupoInv).filter(GrupoInv.id == data['grupo_inv']).first()
-    # get programa
-    programa = db.query(Programa).filter(Programa.id == data['programa']).first()
-    # get facultad
-    facultad = db.query(Facultad).filter(Facultad.id == data['facultad']).first()
-    # get user
-    usuario = db.query(Usuario).filter(Usuario.id == data['usuario_id']).first()
-    # get estado
-    estado = db.query(Estado).filter(Estado.id == 1).first()
-    # get convocatoria
-    convocatoria = db.query(Convocatoria).filter(Convocatoria.id == data['convocatoria_id']).first()
-   
     # Check if grupo_inv exists
     if not grupo_inv:
         raise HTTPException(status_code=400, detail="El grupo de inv. asignado a esta propuesta no se encuentra en la base de datos")
-    
+
+    # get programa
+    programa = db.query(Programa).filter(Programa.id == data['programa']).first()
     # Check if programa exists
     if not programa:
         raise HTTPException(status_code=400, detail="El programa asignado a esta propuesta no se encuentra en la base de datos")
-    
+
+    # get facultad
+    facultad = db.query(Facultad).filter(Facultad.id == data['facultad']).first()
     # Check if facultad exists
     if not facultad:
         raise HTTPException(status_code=400, detail="La facultad asignada a esta propuesta no se encuentra en la base de datos")
-    
+    # get user
+    usuario = db.query(Usuario).filter(Usuario.id == data['usuario_id']).first()
     # Check if usuario exists
     if not usuario:
         raise HTTPException(status_code=400, detail="El usuario asignado a esta propuesta no se encuentra en la base de datos")
 
+    # get estado
+    estado = db.query(Estado).filter(Estado.id == 1).first()
     # Check if estado exists
     if not estado:
         raise HTTPException(status_code=400, detail="El estado asignado a esta propuesta no se encuentra en la base de datos")
 
+    # get convocatoria
+    convocatoria = db.query(Convocatoria).filter(Convocatoria.id == data['convocatoria_id']).first()
     # Check if convocatoria exists
     if not convocatoria:
         raise HTTPException(status_code=400, detail="La convocatoria asignada a esta propuesta no se encuentra en la base de datos")
@@ -157,7 +170,7 @@ def create_propuesta(db: Session, data: dict):
         facultad=facultad,
         programa=programa,
         convocatoria=convocatoria,
-        url_archivo=data['url_archivo']
+        url_archivo_propuesta=data['url_archivo_propuesta']
     )
 
     db.add(db_propuesta)
@@ -165,23 +178,6 @@ def create_propuesta(db: Session, data: dict):
     db.refresh(db_propuesta)
 
     return db_propuesta
-
-
-def create_convocatoria(db: Session, convocatoria: BaseConvocatoria):
-    db_convocatoria = Convocatoria(
-        titulo=convocatoria.titulo,
-        descripcion=convocatoria.descripcion,
-        fecha_inicio=convocatoria.fecha_inicio,
-        fecha_limite=convocatoria.fecha_limite,
-        fecha_inicio_evaluacion=convocatoria.fecha_inicio_evaluacion,
-        fecha_fin_evaluacion=convocatoria.fecha_fin_evaluacion,
-        fecha_publicacion_resultados=convocatoria.fecha_publicacion_resultados,
-    )
-    db.add(db_convocatoria)
-    db.commit()
-    db.refresh(db_convocatoria)
-
-    return db_convocatoria
 
 
 # def get_items(db: Session, skip: int = 0, limit: int = 100):
