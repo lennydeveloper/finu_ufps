@@ -79,6 +79,7 @@ class Propuesta(Base):
     facultad = relationship('Facultad', back_populates="propuesta")
     programa = relationship('Programa', back_populates="propuesta")
     convocatoria = relationship('Convocatoria', back_populates="propuesta")
+    proyecto = relationship('Proyecto', back_populates="propuesta")
 
 
 class Usuario(Base):
@@ -150,8 +151,8 @@ class Proyecto(Base):
     tipo_investigador = Column(String, nullable=True)
     dedicacion_horas = Column(String, nullable=True)
     grupo_investigacion = Column(String, nullable=True)
-    facultad = Column(String) # revisar F, nullable=TrueK
-    departamento = Column(String) # revisar F, nullable=TrueK
+    facultad = Column(String)
+    departamento = Column(String)
     celular = Column(String, nullable=True)
     supervisado = Column(String, nullable=True)
     monto_financiado_finu = Column(String, nullable=True)
@@ -169,3 +170,6 @@ class Proyecto(Base):
     observaciones = Column(String, nullable=True)
     producto = Column(String, nullable=True)
     nombre_producto = Column(String, nullable=True)
+    propuesta_id = Column(Integer, ForeignKey("propuestas.id"))
+
+    propuesta = relationship('Propuesta', back_populates="proyecto")

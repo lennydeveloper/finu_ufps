@@ -3,12 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.exceptions import ResponseValidationError
 from sqlalchemy.orm import Session
+from sqlalchemy import func, and_
 from typing import Annotated
 from datetime import datetime, date
 import requests
 
 from crud import get_user_by_email, create_user, create_propuesta, get_dashboard_totales, get_facultades, get_programas, get_grupos_inv, get_proyectos, get_convocatorias, get_usuarios, get_propuestas, get_informacion_propuesta # , get_users, get_user, create_user_item, get_items
-from models import Base, Usuario, Facultad, Programa, GrupoInv, Convocatoria, Rol, Propuesta, Estado
+from models import Base, Usuario, Facultad, Programa, GrupoInv, Convocatoria, Rol, Propuesta, Estado, Proyecto
 from schemas import UserLoginSchema, UserSchema, CreateUserSchema, UserResponseSchema, BasePropuestaSchema, BaseUser, BaseConvocatoria, FacultadSchema, ProgramaSchema, GrupoInvSchema, ConvocatoriaSchema # , ItemCreate, Item, User, UserCreate
 from database import SessionLocal, engine
 
@@ -38,6 +39,53 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+@app.get('/dashboard/proyectos-ejecutados', status_code=200)
+def _proyectos_ejecutados(programa_id: int = None, db: Session = Depends(get_db)):
+    print(f'Valor del programa_id: {programa_id}')
+    current_year = date.today().year
+    years = [current_year - 6, current_year - 5, current_year - 4, current_year - 3, current_year - 2, current_year - 1, current_year]
+    current_year = str(current_year)
+    
+    # grupos_inv = db.query(GrupoInv).all()
+
+    # for year in years:
+    #     query = (
+    #         db.query(
+    #             GrupoInv.id,
+    #             GrupoInv.nombre,
+    #             func.count(Proyecto.id)
+    #         )
+    #         .outerjoin(Proyecto, GrupoInv.nombre == Proyecto.grupo_investigacion)
+    #         .filter(Proyecto.anio == str(year))
+    #         .group_by(GrupoInv.id, Proyecto.anio)
+    #         .order_by(GrupoInv.id.asc())
+    #     )
+    #     print(query.all())
+    
+    # Query
+    query = (
+        db.query(
+            GrupoInv.id,
+            GrupoInv.nombre,
+            func.count(Proyecto.id)
+        )
+        .outerjoin(Proyecto, GrupoInv.nombre == Proyecto.grupo_investigacion)
+        .filter(Proyecto.anio == '2022')
+        .group_by(GrupoInv.id, Proyecto.anio)
+        .order_by(GrupoInv.id.asc())
+    )
+
+    # Execute the query
+    result = query.all()
+    print(result)
+    # results = db.query(Proyecto.grupo_investigacion, func.count(Proyecto.grupo_investigacion)).filter(and_(Proyecto.anio == '2022')).group_by(Proyecto.grupo_investigacion).all()
+
+    # for grupo_inv, count in results:
+    #     print(f"Grupo Inv: {grupo_inv}, Count: {count}")
+
+    return JSONResponse(content='buena mostro')
 
 
 @app.post('/registro/usuario', response_model=UserResponseSchema, response_model_exclude={'clave'}, status_code=201)
@@ -161,6 +209,16 @@ def _obtener_convocatorias(skip: int = 0, limit: int = 0, db: Session = Depends(
     return items
 
 
+@app.get("/proyectos")
+def _obtener_proyectos(skip: int = 0, limit: int = 0, db: Session = Depends(get_db)):
+    total_proyectos = db.query(Proyecto).count()
+    if limit != 0:
+        proyectos = db.query(Proyecto).offset(skip).limit(limit).all()
+    else:
+        proyectos = db.query(Proyecto).offset(skip).all()
+    return { 'proyectos': proyectos, 'total_proyectos': total_proyectos }
+
+
 @app.get("/facultades", response_model=list[FacultadSchema])
 def _obtener_facultades(skip: int = 0, limit: int = 0, db: Session = Depends(get_db)):
     items = get_facultades(db, skip=skip, limit=limit)
@@ -197,6 +255,31 @@ def _actualizar_estado_propuesta(propuesta_id: Annotated[str, Form()], estado_id
     return JSONResponse(content='La propuesta ha sido actualizada')
 
 
+@app.post("/update/calificacion-propuesta", status_code=200)
+async def _actualizar_calificacion_propuesta(puntaje: Annotated[str, Form()], estado_id: Annotated[int, Form()], propuesta_id: Annotated[int, Form()], file: UploadFile = File(...), db: Session = Depends(get_db)):
+    STORAGE_ZONE_NAME = 'finu-storage'
+    ACCESS_KEY = '64e5ab92-d290-4a0b-96cd1770b46c-2bb2-4201'
+    BASE_URL = "storage.bunnycdn.com"
+    NAME = secure_filename(file.filename)
+
+    headers = {
+    "AccessKey": ACCESS_KEY,
+    "Content-Type": "application/octet-stream",
+    "accept": "application/json"
+    }
+
+    with open(file.filename, 'wb'):
+        content = await file.read()
+        url = f"https://{BASE_URL}/{STORAGE_ZONE_NAME}/{NAME}"
+        response = requests.put(url, headers=headers, data=content)
+
+        db.query(Propuesta).filter(Propuesta.id == propuesta_id).update({Propuesta.estado_id: estado_id, Propuesta.calificacion: puntaje, Propuesta.url_archivo_calificacion: url})
+        db.commit()
+        return JSONResponse(content='La propuesta ha sido actualizada exitosamente')
+    # db.query(Propuesta).filter(Propuesta.id == propuesta_id).update({Propuesta.estado_id: estado_id, Propuesta.observaciones: observaciones})
+    # db.commit()
+
+
 @app.post('/upload/files', status_code=201)
 async def _upload(file: UploadFile = File(...)):
     try:
@@ -222,6 +305,7 @@ async def _upload(file: UploadFile = File(...)):
 
 @app.get("/download")
 def _download(url: str):
+    import re
     STORAGE_ZONE_NAME = 'finu-storage'
     ACCESS_KEY = '64e5ab92-d290-4a0b-96cd1770b46c-2bb2-4201'
     BASE_URL = "storage.bunnycdn.com"
@@ -234,12 +318,14 @@ def _download(url: str):
     try:
         response = requests.get(url, stream=True, headers=headers)
         response.raise_for_status()
+        idx = url.rfind('/') + 1
+        filename = url[idx::]
 
         def fetch_data(r):
             for chunk in r.iter_content(chunk_size=8192):
                 yield chunk
 
-        return StreamingResponse(fetch_data(response), media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document', headers={'Content-Disposition': f'attachment; filename={"archivo_de_prueba.docx"}'})
+        return StreamingResponse(fetch_data(response), media_type=response.headers.get('content-type'), headers={'Content-Disposition': f'attachment; filename={filename}'})
     except requests.exceptions.HTTPError:
         if response.status_code == 401:
             return JSONResponse(content='No tiene permisos para descargar este archivo', status_code=401)
