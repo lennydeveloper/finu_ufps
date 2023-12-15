@@ -155,7 +155,7 @@ class Proyecto(Base):
     departamento = Column(String)
     celular = Column(String, nullable=True)
     supervisado = Column(String, nullable=True)
-    monto_financiado_finu = Column(String, nullable=True)
+    monto_financiado_finu = Column(Integer, nullable=True)
     duracion = Column(String, nullable=True)
     prorroga_1 = Column(String, nullable=True)
     prorroga_2 = Column(String, nullable=True)

@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 # from models import User, Item
 # from schemas import UserCreate, ItemCreate
@@ -64,7 +65,7 @@ def get_propuestas(db: Session, convocatoria_id: int = 0, usuario_id: int = 0, r
 def get_dashboard_totales(db: Session):
     convocatorias = db.query(Convocatoria).count()
     proyectos = db.query(Proyecto).count()
-    presupuesto = 0
+    presupuesto = db.query(func.sum(Proyecto.monto_financiado_finu)).scalar()
     docentes = db.query(Usuario).filter(Usuario.rol_id == 2).count()
     estudiantes = db.query(Usuario).filter(Usuario.rol_id == 3).count()
     grupos_inv = db.query(GrupoInv).count()

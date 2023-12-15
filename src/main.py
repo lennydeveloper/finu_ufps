@@ -42,50 +42,25 @@ def get_db():
 
 
 @app.get('/dashboard/proyectos-ejecutados', status_code=200)
-def _proyectos_ejecutados(programa_id: int = None, db: Session = Depends(get_db)):
-    print(f'Valor del programa_id: {programa_id}')
+def _proyectos_ejecutados(db: Session = Depends(get_db)):
     current_year = date.today().year
-    years = [current_year - 6, current_year - 5, current_year - 4, current_year - 3, current_year - 2, current_year - 1, current_year]
+    years = [current_year - 5, current_year - 4, current_year - 3, current_year - 2, current_year - 1, current_year]
     current_year = str(current_year)
-    
-    # grupos_inv = db.query(GrupoInv).all()
 
-    # for year in years:
-    #     query = (
-    #         db.query(
-    #             GrupoInv.id,
-    #             GrupoInv.nombre,
-    #             func.count(Proyecto.id)
-    #         )
-    #         .outerjoin(Proyecto, GrupoInv.nombre == Proyecto.grupo_investigacion)
-    #         .filter(Proyecto.anio == str(year))
-    #         .group_by(GrupoInv.id, Proyecto.anio)
-    #         .order_by(GrupoInv.id.asc())
-    #     )
-    #     print(query.all())
-    
-    # Query
-    query = (
-        db.query(
-            GrupoInv.id,
-            GrupoInv.nombre,
-            func.count(Proyecto.id)
-        )
-        .outerjoin(Proyecto, GrupoInv.nombre == Proyecto.grupo_investigacion)
-        .filter(Proyecto.anio == '2022')
-        .group_by(GrupoInv.id, Proyecto.anio)
-        .order_by(GrupoInv.id.asc())
-    )
+    proyectos = []
+    presupuesto = []
 
-    # Execute the query
-    result = query.all()
-    print(result)
-    # results = db.query(Proyecto.grupo_investigacion, func.count(Proyecto.grupo_investigacion)).filter(and_(Proyecto.anio == '2022')).group_by(Proyecto.grupo_investigacion).all()
+    # Cantidad de proyectos por anio
+    # presupuesto total por anio
 
-    # for grupo_inv, count in results:
-    #     print(f"Grupo Inv: {grupo_inv}, Count: {count}")
-
-    return JSONResponse(content='buena mostro')
+    for item in years:
+        # Cantidad de proyectos
+        count_proyectos = db.query(Proyecto).filter(Proyecto.anio == str(item)).count()
+        proyectos.append(count_proyectos)
+        # presupuesto total por anio
+        count_presupuesto = db.query(func.sum(Proyecto.monto_financiado_finu)).filter(Proyecto.anio == str(item)).scalar()
+        presupuesto.append(count_presupuesto)
+    return { 'proyectos': proyectos, 'presupuesto': presupuesto }
 
 
 @app.post('/registro/usuario', response_model=UserResponseSchema, response_model_exclude={'clave'}, status_code=201)
