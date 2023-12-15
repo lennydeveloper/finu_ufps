@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.exceptions import ResponseValidationError
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, desc
 from typing import Annotated
 from datetime import datetime, date
 import requests
@@ -210,12 +210,20 @@ def _obtener_convocatorias(skip: int = 0, limit: int = 0, db: Session = Depends(
 
 
 @app.get("/proyectos")
-def _obtener_proyectos(skip: int = 0, limit: int = 0, db: Session = Depends(get_db)):
-    total_proyectos = db.query(Proyecto).count()
-    if limit != 0:
-        proyectos = db.query(Proyecto).offset(skip).limit(limit).all()
+def _obtener_proyectos(skip: int = 0, limit: int = 0, rol_id: int = 0, usuario_id: int = 0, db: Session = Depends(get_db)):
+    if rol_id == 1:
+        total_proyectos = db.query(Proyecto).count()
+        if limit != 0:
+            proyectos = db.query(Proyecto).order_by(desc(Proyecto.id)).offset(skip).limit(limit).all()
+        else:
+            proyectos = db.query(Proyecto).order_by(desc(Proyecto.id)).offset(skip).all()
     else:
-        proyectos = db.query(Proyecto).offset(skip).all()
+        if limit == 0:
+            proyectos = db.query(Proyecto).order_by(desc(Proyecto.id)).join(Propuesta).filter(Propuesta.usuario_id == usuario_id).offset(skip).limit(limit).all()
+        else:
+            proyectos = db.query(Proyecto).order_by(desc(Proyecto.id)).join(Propuesta).filter(Propuesta.usuario_id == usuario_id).offset(skip).all()
+        total_proyectos = len(proyectos)
+    
     return { 'proyectos': proyectos, 'total_proyectos': total_proyectos }
 
 
@@ -244,8 +252,8 @@ def _obtener_usuarios(skip: int = 0, limit: int = 0, db: Session = Depends(get_d
 
 
 @app.get("/propuestas", response_model_exclude={'usuario.clave'}, response_model=list[BasePropuestaSchema])
-def _obtener_propuestas(usuario_id: int = 0, convocatoria_id: int = 0, db: Session = Depends(get_db)):
-    return get_propuestas(db=db, usuario_id=usuario_id, convocatoria_id=convocatoria_id)
+def _obtener_propuestas(usuario_id: int = 0, convocatoria_id: int = 0, rol_id: int = 0, db: Session = Depends(get_db)):
+    return get_propuestas(db=db, usuario_id=usuario_id, convocatoria_id=convocatoria_id, rol_id=rol_id)
 
 
 @app.post("/update/estado-propuesta", status_code=200)
@@ -275,6 +283,17 @@ async def _actualizar_calificacion_propuesta(puntaje: Annotated[str, Form()], es
 
         db.query(Propuesta).filter(Propuesta.id == propuesta_id).update({Propuesta.estado_id: estado_id, Propuesta.calificacion: puntaje, Propuesta.url_archivo_calificacion: url})
         db.commit()
+
+        # Traspaso de propuesta a proyecto
+        propuesta = db.query(Propuesta).filter(Propuesta.id == propuesta_id).first()
+        db_proyecto = Proyecto(
+            propuesta=propuesta
+        )
+
+        db.add(db_proyecto)
+        db.commit()
+        db.refresh(db_proyecto)
+
         return JSONResponse(content='La propuesta ha sido actualizada exitosamente')
     # db.query(Propuesta).filter(Propuesta.id == propuesta_id).update({Propuesta.estado_id: estado_id, Propuesta.observaciones: observaciones})
     # db.commit()

@@ -51,8 +51,11 @@ def get_convocatorias(db: Session, skip: int = 0, limit: int = 100):
     return db.query(Convocatoria).offset(skip).limit(limit).all()
 
 
-def get_propuestas(db: Session, convocatoria_id: int = 0, usuario_id: int = 0):
-    print(convocatoria_id)
+def get_propuestas(db: Session, convocatoria_id: int = 0, usuario_id: int = 0, rol_id: int = 0):
+    # Obtener propuestas para el rol de admin
+    if rol_id == 1:
+        return db.query(Propuesta).all()
+    # Obtener propuestas (filtro por convocatoria)
     if convocatoria_id == 0:
         return db.query(Propuesta).filter(Propuesta.usuario_id == usuario_id).all()
     return db.query(Propuesta).filter(Propuesta.convocatoria_id == convocatoria_id).all()

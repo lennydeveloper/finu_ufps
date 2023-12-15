@@ -119,6 +119,9 @@ class BasePropuestaSchema(BaseModel):
     estado: EstadoSchema
     usuario: UserResponseSchema
     url_archivo_propuesta: str
+    observaciones: Union[str, None] = None
+    calificacion: Union[int, None] = None
+    url_archivo_calificacion: Union[str, None] = None
 
     class Config:
         orm_mode = True
