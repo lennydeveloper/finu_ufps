@@ -18,26 +18,26 @@ def get_user_by_email(db: Session, email: str):
 
 def get_programas(db: Session, skip: int = 0, limit: int = 100):
     if limit == 0:
-        return db.query(Programa).offset(skip).all()
-    return db.query(Programa).offset(skip).limit(limit).all()
+        return db.query(Programa).order_by(Programa.id.asc()).offset(skip).all()
+    return db.query(Programa).order_by(Programa.id.asc()).offset(skip).limit(limit).all()
 
 
 def get_facultades(db: Session, skip: int = 0, limit: int = 100):
     if limit == 0:
-        return db.query(Facultad).offset(skip).all()
-    return db.query(Facultad).offset(skip).limit(limit).all()
+        return db.query(Facultad).order_by(Facultad.id.asc()).offset(skip).all()
+    return db.query(Facultad).order_by(Facultad.id.asc()).offset(skip).limit(limit).all()
 
 
 def get_grupos_inv(db: Session, skip: int = 0, limit: int = 100):
     if limit == 0:
-        return db.query(GrupoInv).offset(skip).all()
-    return db.query(GrupoInv).offset(skip).limit(limit).all()
+        return db.query(GrupoInv).order_by(GrupoInv.id.asc()).offset(skip).all()
+    return db.query(GrupoInv).order_by(GrupoInv.id.asc()).offset(skip).limit(limit).all()
 
 
 def get_proyectos(db: Session, skip: int = 0, limit: int = 100):
     if limit == 0:
-        return db.query(Proyecto).offset(skip).all()
-    return db.query(Proyecto).offset(skip).limit(limit).all()
+        return db.query(Proyecto).order_by(Proyecto.id.asc()).offset(skip).all()
+    return db.query(Proyecto).order_by(Proyecto.id.asc()).offset(skip).limit(limit).all()
 
 
 def get_usuarios(db: Session, skip: int = 0, limit: int = 100):
@@ -48,18 +48,18 @@ def get_usuarios(db: Session, skip: int = 0, limit: int = 100):
 
 def get_convocatorias(db: Session, skip: int = 0, limit: int = 100):
     if limit == 0:
-        return db.query(Convocatoria).offset(skip).all()
-    return db.query(Convocatoria).offset(skip).limit(limit).all()
+        return db.query(Convocatoria).order_by(Convocatoria.id.asc()).offset(skip).all()
+    return db.query(Convocatoria).order_by(Convocatoria.id.asc()).offset(skip).limit(limit).all()
 
 
 def get_propuestas(db: Session, convocatoria_id: int = 0, usuario_id: int = 0, rol_id: int = 0):
     # Obtener propuestas para el rol de admin
     if rol_id == 1:
-        return db.query(Propuesta).all()
+        return db.query(Propuesta).order_by(Propuesta.id.asc()).all()
     # Obtener propuestas (filtro por convocatoria)
     if convocatoria_id == 0:
-        return db.query(Propuesta).filter(Propuesta.usuario_id == usuario_id).all()
-    return db.query(Propuesta).filter(Propuesta.convocatoria_id == convocatoria_id).all()
+        return db.query(Propuesta).order_by(Propuesta.id.asc()).filter(Propuesta.usuario_id == usuario_id).all()
+    return db.query(Propuesta).order_by(Propuesta.id.asc()).filter(Propuesta.convocatoria_id == convocatoria_id).all()
 
 
 def get_dashboard_totales(db: Session):
@@ -81,9 +81,9 @@ def get_dashboard_totales(db: Session):
 
 
 def get_informacion_propuesta(db: Session):
-    programas = db.query(Programa).all()
-    grupos_inv = db.query(GrupoInv).all()
-    facultades = db.query(Facultad).all()
+    programas = db.query(Programa).order_by(Programa.id.asc()).all()
+    grupos_inv = db.query(GrupoInv).order_by(GrupoInv.id.asc()).all()
+    facultades = db.query(Facultad).order_by(Facultad.id.asc()).all()
 
     return {
         'programas': programas,

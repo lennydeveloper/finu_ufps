@@ -126,6 +126,51 @@ class BasePropuestaSchema(BaseModel):
     class Config:
         orm_mode = True
 
+
+class BaseProyectoSchema(BaseModel):
+    tipo_proyecto: str
+    departamento: str
+    fecha_terminacion_contrato: str
+    estado: str
+    alianza: str
+    celular: str
+    informes_parciales_entregados: str
+    observaciones: str
+    id: int
+    investigador: str
+    supervisado: str
+    informe_final: str
+    producto: str
+    tipo_investigador: str
+    monto_financiado_finu: str
+    presupuesto: str
+    nombre_producto: str
+    contrato: str
+    dedicacion_horas: str
+    duracion: str
+    presupuesto_no_aprobado: str
+    propuesta_id: BasePropuestaSchema
+    anio: str
+    grupo_investigacion: str
+    prorroga_1: str
+    convocatoria: str
+    facultad: str
+    prorroga_2: str
+    evaluador: str
+    proyecto: str
+    fecha_inicio_contrato: str
+
+    class Config:
+        orm_mode = True
+
+
+class ProyectoResponseSchema(BaseModel):
+    proyectos: BaseProyectoSchema
+    total_proyectos: int
+
+    class Config:
+        orm_mode = True
+
 # class ItemBase(BaseModel):
 #     title: str
 #     description: Union[str, None] = None

@@ -4,13 +4,13 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.exceptions import ResponseValidationError
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, desc
-from typing import Annotated
+from typing import Annotated, Union, Optional
 from datetime import datetime, date
 import requests
 
 from crud import get_user_by_email, create_user, create_propuesta, get_dashboard_totales, get_facultades, get_programas, get_grupos_inv, get_proyectos, get_convocatorias, get_usuarios, get_propuestas, get_informacion_propuesta # , get_users, get_user, create_user_item, get_items
 from models import Base, Usuario, Facultad, Programa, GrupoInv, Convocatoria, Rol, Propuesta, Estado, Proyecto
-from schemas import UserLoginSchema, UserSchema, CreateUserSchema, UserResponseSchema, BasePropuestaSchema, BaseUser, BaseConvocatoria, FacultadSchema, ProgramaSchema, GrupoInvSchema, ConvocatoriaSchema # , ItemCreate, Item, User, UserCreate
+from schemas import UserLoginSchema, UserSchema, CreateUserSchema, UserResponseSchema, BasePropuestaSchema, ProyectoResponseSchema, BaseUser, BaseConvocatoria, FacultadSchema, ProgramaSchema, GrupoInvSchema, ConvocatoriaSchema # , ItemCreate, Item, User, UserCreate
 from database import SessionLocal, engine
 
 # utils >>>
@@ -49,6 +49,8 @@ def _proyectos_ejecutados(db: Session = Depends(get_db)):
 
     proyectos = []
     presupuesto = []
+    total_proyectos = 0
+    total_presupuesto = 0
 
     # Cantidad de proyectos por anio
     # presupuesto total por anio
@@ -56,11 +58,13 @@ def _proyectos_ejecutados(db: Session = Depends(get_db)):
     for item in years:
         # Cantidad de proyectos
         count_proyectos = db.query(Proyecto).filter(Proyecto.anio == str(item)).count()
+        total_proyectos += count_proyectos if count_proyectos is not None else 0
         proyectos.append(count_proyectos)
         # presupuesto total por anio
         count_presupuesto = db.query(func.sum(Proyecto.monto_financiado_finu)).filter(Proyecto.anio == str(item)).scalar()
+        total_presupuesto += count_presupuesto if count_presupuesto is not None else 0
         presupuesto.append(count_presupuesto)
-    return { 'proyectos': proyectos, 'presupuesto': presupuesto }
+    return { 'proyectos': proyectos, 'presupuesto': presupuesto, 'total_proyectos': total_proyectos, 'total_presupuesto': total_presupuesto }
 
 
 @app.post('/registro/usuario', response_model=UserResponseSchema, response_model_exclude={'clave'}, status_code=201)
@@ -184,10 +188,18 @@ def _obtener_convocatorias(skip: int = 0, limit: int = 0, db: Session = Depends(
     return items
 
 
+@app.get("/convocatoria", response_model=ConvocatoriaSchema)
+def _obtener_convocatoria_by_id(id: int = 0, db: Session = Depends(get_db)):
+    convocatoria = db.query(Convocatoria).filter(Convocatoria.id == id).first()
+    if not convocatoria:
+        return JSONResponse(content='La convocatoria consultada no existe', status_code=404)
+    return convocatoria
+
+
 @app.get("/proyectos")
 def _obtener_proyectos(skip: int = 0, limit: int = 0, rol_id: int = 0, usuario_id: int = 0, db: Session = Depends(get_db)):
     if rol_id == 1:
-        total_proyectos = db.query(Proyecto).count()
+        total_proyectos = db.query(Proyecto).join(Propuesta).count()
         if limit != 0:
             proyectos = db.query(Proyecto).order_by(desc(Proyecto.id)).offset(skip).limit(limit).all()
         else:
@@ -238,6 +250,54 @@ def _actualizar_estado_propuesta(propuesta_id: Annotated[str, Form()], estado_id
     return JSONResponse(content='La propuesta ha sido actualizada')
 
 
+@app.post("/update/convocatoria", status_code=200)
+async def _actualizar_convocatoria(
+    id: Annotated[str, Form()],
+    titulo: Annotated[str, Form()],
+    descripcion: Annotated[str, Form()],
+    fecha_inicio: Annotated[date, Form()],
+    fecha_limite: Annotated[date, Form()],
+    fecha_inicio_evaluacion: Annotated[date, Form()],
+    fecha_fin_evaluacion: Annotated[date, Form()],
+    fecha_publicacion_resultados: Annotated[date, Form()],
+    tipo_convocatoria: Annotated[str, Form()],
+    file: Union[UploadFile, None] = File(None),
+    db: Session = Depends(get_db)
+) -> JSONResponse:
+    STORAGE_ZONE_NAME = 'finu-storage'
+    ACCESS_KEY = '64e5ab92-d290-4a0b-96cd1770b46c-2bb2-4201'
+    BASE_URL = "storage.bunnycdn.com"
+
+    headers = {
+    "AccessKey": ACCESS_KEY,
+    "Content-Type": "application/octet-stream",
+    "accept": "application/json"
+    }
+
+    db_params = {
+        'titulo': titulo, 
+        'descripcion': descripcion, 
+        'fecha_inicio': fecha_inicio, 
+        'fecha_limite': fecha_limite, 
+        'fecha_inicio_evaluacion': fecha_inicio_evaluacion, 
+        'fecha_fin_evaluacion': fecha_fin_evaluacion, 
+        'fecha_publicacion_resultados': fecha_publicacion_resultados, 
+        'tipo_convocatoria': tipo_convocatoria,
+    }
+
+    if file is not None:
+        with open(file.filename, 'wb'):
+            NAME = secure_filename(file.filename)
+            content = await file.read()
+            url = f"https://{BASE_URL}/{STORAGE_ZONE_NAME}/{NAME}"
+            db_params.update({'url_archivo': url})
+            response = requests.put(url, headers=headers, data=content)
+
+    db.query(Convocatoria).filter(Convocatoria.id == id).update(db_params)
+    db.commit()
+    return JSONResponse(content='La convocatoria ha sido actualizada')
+
+
 @app.post("/update/calificacion-propuesta", status_code=200)
 async def _actualizar_calificacion_propuesta(puntaje: Annotated[str, Form()], estado_id: Annotated[int, Form()], propuesta_id: Annotated[int, Form()], file: UploadFile = File(...), db: Session = Depends(get_db)):
     STORAGE_ZONE_NAME = 'finu-storage'
@@ -270,8 +330,6 @@ async def _actualizar_calificacion_propuesta(puntaje: Annotated[str, Form()], es
         db.refresh(db_proyecto)
 
         return JSONResponse(content='La propuesta ha sido actualizada exitosamente')
-    # db.query(Propuesta).filter(Propuesta.id == propuesta_id).update({Propuesta.estado_id: estado_id, Propuesta.observaciones: observaciones})
-    # db.commit()
 
 
 @app.post('/upload/files', status_code=201)
